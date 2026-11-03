@@ -24,6 +24,7 @@ import { SimklSyncService } from "./simklSyncService.js";
 
 export const LibrarySourceMode = {
   MDBLIST: "mdblist",
+  STREMIO: "stremio",
   LOCAL: "local",
   TRAKT: "trakt",
   SIMKL: "simkl"

@@ -1,7 +1,11 @@
 import { StremioAccount } from "../../../data/repository/stremioAccount.js";
 import { addonRepository } from "../../../data/repository/addonRepository.js";
 import { ProfileManager } from "../../../core/profile/profileManager.js";
-import { TraktSettingsStore, WatchProgressSource } from "../../../data/local/traktSettingsStore.js";
+import {
+  TraktLibrarySourceMode,
+  TraktSettingsStore,
+  WatchProgressSource
+} from "../../../data/local/traktSettingsStore.js";
 import { QrCodeGenerator, t, escapeHtml, escapeAttribute } from "./settingsScreenContext.js";
 
 const POLL_INTERVAL_MS = 3000;
@@ -78,6 +82,7 @@ export function openStremioAuthorization() {
           if (authorized) {
             // First connection: bring the account's addons and select Stremio for Continue Watching.
             TraktSettingsStore.setWatchProgressSource(WatchProgressSource.STREMIO);
+            TraktSettingsStore.setLibrarySourceMode(TraktLibrarySourceMode.STREMIO);
             const added = await StremioAccount.importAddons(addonRepository).catch(() => 0);
             this.stremioAccountMessage = t(
               "stremio_connected",

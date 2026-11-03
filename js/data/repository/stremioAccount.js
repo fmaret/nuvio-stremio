@@ -105,37 +105,42 @@ export function stremioLibraryItemToProgress(row) {
   };
 }
 
+// A LibraryItem as stremio-core creates it before anything was watched.
+function newLibraryItem(item, now) {
+  const isSeries = String(item.contentType || "").toLowerCase() === "series";
+  return {
+    _id: item.contentId,
+    name: item.title || item.contentId,
+    type: isSeries ? "series" : "movie",
+    poster: item.poster || null,
+    posterShape: "poster",
+    removed: true,
+    temp: true,
+    _ctime: now,
+    _mtime: now,
+    behaviorHints: { defaultVideoId: null, featuredVideoId: null, hasScheduledVideos: false },
+    state: {
+      lastWatched: null,
+      timeWatched: 0,
+      timeOffset: 0,
+      overallTimeWatched: 0,
+      timesWatched: 0,
+      flaggedWatched: 0,
+      duration: 0,
+      video_id: null,
+      watched: null,
+      noNotif: false
+    }
+  };
+}
+
 // Applies one playback tick the way stremio-core's TimeChanged + unload handlers do.
 export function applyStremioProgress(row, progress, now = nowIso()) {
   const isSeries = String(progress.contentType || "").toLowerCase() === "series";
   const videoId = String((isSeries && progress.videoId) || progress.contentId);
   const position = Math.max(0, Math.trunc(Number(progress.positionMs || 0)));
   const duration = Math.max(0, Math.trunc(Number(progress.durationMs || 0)));
-  const item = row
-    ? { ...row, state: { ...row.state } }
-    : {
-        _id: progress.contentId,
-        name: progress.title || progress.contentId,
-        type: isSeries ? "series" : "movie",
-        poster: progress.poster || null,
-        posterShape: "poster",
-        removed: true,
-        temp: true,
-        _ctime: now,
-        behaviorHints: { defaultVideoId: null, featuredVideoId: null, hasScheduledVideos: false },
-        state: {
-          lastWatched: null,
-          timeWatched: 0,
-          timeOffset: 0,
-          overallTimeWatched: 0,
-          timesWatched: 0,
-          flaggedWatched: 0,
-          duration: 0,
-          video_id: null,
-          watched: null,
-          noNotif: false
-        }
-      };
+  const item = row ? { ...row, state: { ...row.state } } : newLibraryItem(progress, now);
   const state = item.state;
   if (state.video_id !== videoId) {
     state.video_id = videoId;
@@ -265,6 +270,39 @@ export const StremioAccount = {
     });
     pushQueue = task.catch(() => {});
     return task;
+  },
+
+  // The user's Stremio Library: items they added (not removed), newest change first.
+  async getLibraryItems() {
+    if (!this.connected()) return [];
+    const items = await loadLibrary();
+    return [...items.values()]
+      .filter((row) => !row.removed && (row.type === "movie" || row.type === "series"))
+      .sort((left, right) => (Date.parse(right._mtime) || 0) - (Date.parse(left._mtime) || 0))
+      .map((row) => ({
+        contentId: row._id,
+        contentType: row.type,
+        title: row.name,
+        poster: row.poster || null,
+        posterShape: row.posterShape || "poster",
+        updatedAt: Date.parse(row._mtime) || 0
+      }));
+  },
+
+  async isInLibrary(contentId) {
+    if (!this.connected() || !contentId) return false;
+    const row = (await loadLibrary()).get(String(contentId));
+    return Boolean(row && !row.removed);
+  },
+
+  async setInLibrary(item, saved) {
+    const pid = profileId();
+    const items = await loadLibrary();
+    const now = nowIso();
+    const base = items.get(item.contentId) || newLibraryItem(item, now);
+    const next = { ...base, removed: !saved, temp: false, _mtime: now };
+    await api("datastorePut", { collection: "libraryItem", changes: [next] }, pid);
+    items.set(next._id, next);
   },
 
   async getAddonUrls() {

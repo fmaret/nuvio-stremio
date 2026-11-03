@@ -10,6 +10,7 @@ export const WatchProgressSource = {
 
 export const TraktLibrarySourceMode = {
   MDBLIST: "mdblist",
+  STREMIO: "stremio",
   TRAKT: "trakt",
   SIMKL: "simkl",
   LOCAL: "local"
@@ -46,6 +47,7 @@ function normalizeLibrarySourceMode(value) {
   if (normalized === TraktLibrarySourceMode.MDBLIST) return TraktLibrarySourceMode.MDBLIST;
   if (normalized === TraktLibrarySourceMode.LOCAL) return TraktLibrarySourceMode.LOCAL;
   if (normalized === TraktLibrarySourceMode.SIMKL) return TraktLibrarySourceMode.SIMKL;
+  if (normalized === TraktLibrarySourceMode.STREMIO) return TraktLibrarySourceMode.STREMIO;
   return TraktLibrarySourceMode.TRAKT;
 }
 

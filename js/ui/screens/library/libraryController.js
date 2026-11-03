@@ -805,6 +805,7 @@ export class LibraryController {
     if (this.state.sourceMode === LibrarySourceMode.SIMKL) {
       return "SIMKL";
     }
+    if (this.state.sourceMode === LibrarySourceMode.STREMIO) return "STREMIO";
     if (this.state.isNuvioAccount) {
       return t("library_source_nuvio", {}, "NUVIO");
     }

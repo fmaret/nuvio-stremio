@@ -114,3 +114,27 @@ test("pushProgress writes the updated item to Stremio's datastore and throttles 
   assert.equal(puts[1].body.changes[0].state.timeWatched, 2 * MIN, "first tick of a new video counts 0, like stremio-core");
   assert.equal(calls.filter((call) => call.method === "datastoreGet").length, 1, "library fetched once then cached");
 });
+
+test("library add/remove writes Stremio's removed flag and feeds the Library list", async () => {
+  const calls = [];
+  globalThis.fetch = async (url, init) => {
+    calls.push({ method: String(url).split("/api/")[1], body: JSON.parse(init.body) });
+    return new Response(JSON.stringify({ result: { success: true } }), { status: 200 });
+  };
+  const { StremioAccount } = await import("./stremioAccount.js");
+  const item = { contentId: "tt1375666", contentType: "movie", title: "Inception", poster: "p.jpg" };
+
+  await StremioAccount.setInLibrary(item, true);
+  const added = calls.at(-1).body.changes[0];
+  assert.equal(calls.at(-1).method, "datastorePut");
+  assert.equal(added.removed, false);
+  assert.equal(added.temp, false);
+  assert.equal(added.state.lastWatched, null, "adding to the library is not a watch");
+  assert.equal(await StremioAccount.isInLibrary("tt1375666"), true);
+  assert.deepEqual((await StremioAccount.getLibraryItems()).map((entry) => entry.contentId).includes("tt1375666"), true);
+
+  await StremioAccount.setInLibrary(item, false);
+  assert.equal(calls.at(-1).body.changes[0].removed, true);
+  assert.equal(await StremioAccount.isInLibrary("tt1375666"), false);
+  assert.equal((await StremioAccount.getLibraryItems()).some((entry) => entry.contentId === "tt1375666"), false);
+});

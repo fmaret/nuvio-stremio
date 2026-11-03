@@ -23,6 +23,7 @@ import { TraktLibrarySourceMode, TraktSettingsStore } from "../local/traktSettin
 import { SimklAuthService } from "./simklAuthService.js";
 
 import { SimklSyncService } from "./simklSyncService.js";
+import { StremioAccount } from "./stremioAccount.js";
 
 import {
   readRemoteState,
@@ -45,6 +46,7 @@ import {
   hydrateEntries,
   getRemoteEntries,
   getLocalEntries,
+  mergeItemIntoMap,
   membershipMapFromEntries,
   upsertPersonalItem,
   removePersonalItem
@@ -82,12 +84,16 @@ export class LibraryRepository {
     if (selectedMode === TraktLibrarySourceMode.SIMKL) {
       return SimklAuthService.isAuthenticated() ? LibrarySourceMode.SIMKL : LibrarySourceMode.LOCAL;
     }
+    if (selectedMode === TraktLibrarySourceMode.STREMIO) {
+      return StremioAccount.connected() ? LibrarySourceMode.STREMIO : LibrarySourceMode.LOCAL;
+    }
     if (selectedMode !== TraktLibrarySourceMode.TRAKT) {
       return LibrarySourceMode.LOCAL;
     }
     const traktToken = await TraktAuthService.getValidAccessToken().catch(() => null);
     if (!traktToken) {
-      return LibrarySourceMode.LOCAL;
+      // Trakt is only the unset default here; a connected Stremio account wins.
+      return StremioAccount.connected() ? LibrarySourceMode.STREMIO : LibrarySourceMode.LOCAL;
     }
     return LibrarySourceMode.TRAKT;
   }
@@ -95,7 +101,7 @@ export class LibraryRepository {
   async getListTabs({ sourceMode = null } = {}) {
     const resolvedSourceMode = sourceMode || (await this.getSourceMode());
     if (resolvedSourceMode === LibrarySourceMode.MDBLIST) return MdbListLibrary.tabs();
-    if (resolvedSourceMode === LibrarySourceMode.LOCAL) {
+    if (resolvedSourceMode === LibrarySourceMode.LOCAL || resolvedSourceMode === LibrarySourceMode.STREMIO) {
       return [];
     }
     if (resolvedSourceMode === LibrarySourceMode.SIMKL) {
@@ -132,6 +138,16 @@ export class LibraryRepository {
       const entries = await SimklSyncService.getLibraryEntries();
       return hydrate ? hydrateEntries(entries) : entries;
     }
+    if (resolvedSourceMode === LibrarySourceMode.STREMIO) {
+      // Shaped like local entries (single "local" list) so the Library screen needs no tabs.
+      const entriesMap = new Map();
+      (await StremioAccount.getLibraryItems()).forEach((item) => {
+        const normalized = normalizeSavedItem(item);
+        mergeItemIntoMap(entriesMap, "local", normalized, normalized.updatedAt, null);
+      });
+      const entries = Array.from(entriesMap.values());
+      return hydrate ? hydrateEntries(entries) : entries;
+    }
     return resolvedSourceMode === LibrarySourceMode.TRAKT ? getRemoteEntries({ hydrate }) : getLocalEntries({ hydrate });
   }
 
@@ -148,6 +164,9 @@ export class LibraryRepository {
     }
     if (resolvedSourceMode === LibrarySourceMode.SIMKL) {
       return SimklSyncService.getMembershipSnapshot(item);
+    }
+    if (resolvedSourceMode === LibrarySourceMode.STREMIO) {
+      return { listMembership: { local: await StremioAccount.isInLibrary(item.itemId || item.id || "") } };
     }
     const [entries, listTabs] = await Promise.all([
       this.getItems({ sourceMode: resolvedSourceMode }),
@@ -222,6 +241,11 @@ export class LibraryRepository {
     }
     if (sourceMode === LibrarySourceMode.SIMKL) {
       await SimklSyncService.applyMembershipChanges(item, changes, options);
+      return;
+    }
+    if (sourceMode === LibrarySourceMode.STREMIO) {
+      const saved = Object.values(changes?.desiredMembership || {}).some(Boolean);
+      await StremioAccount.setInLibrary(normalizeSavedItem(item), saved);
       return;
     }
 

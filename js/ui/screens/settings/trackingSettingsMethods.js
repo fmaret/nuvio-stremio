@@ -256,7 +256,8 @@ export function createTrackingSettingsMethods() {
           : []),
         { id: TraktLibrarySourceMode.LOCAL, label: "Nuvio" },
         ...(traktConnected ? [{ id: TraktLibrarySourceMode.TRAKT, label: "Trakt" }] : []),
-        ...(simklConnected ? [{ id: TraktLibrarySourceMode.SIMKL, label: "Simkl" }] : [])
+        ...(simklConnected ? [{ id: TraktLibrarySourceMode.SIMKL, label: "Simkl" }] : []),
+        ...(StremioAccount.connected() ? [{ id: TraktLibrarySourceMode.STREMIO, label: "Stremio" }] : [])
       ];
 
       setAction("tracking:trakt", () => {
