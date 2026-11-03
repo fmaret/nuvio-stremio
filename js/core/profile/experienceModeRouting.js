@@ -7,8 +7,9 @@ export function resolveExperienceRoute(profileId) {
   const layout = LayoutPreferences.getForProfile(profileId);
   const effectiveMode = experience.mode || (layout.hasChosenLayout ? "ADVANCED" : null);
 
+  // This fork lands straight on Home instead of the first-run experience picker.
   if (!effectiveMode) {
-    return "experienceModeSelection";
+    return "home";
   }
   if (effectiveMode === "ESSENTIAL" && !experience.addonSetupSkipped) {
     const cachedAddons = addonRepository.getCachedInstalledAddons();

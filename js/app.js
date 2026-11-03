@@ -331,6 +331,7 @@ async function enterWithLastProfile({ restoreWebOsRoute = false } = {}) {
       ...(StartupSyncService.started ? { forceReload: true } : {})
     });
   }
+  globalThis.hideBootSplash?.();
 }
 
 async function routeAfterAuthentication() {
@@ -670,47 +671,18 @@ async function bootstrapApp() {
       ProviderCredentialSyncService.cancelForegroundPull();
       void MediaServerSyncService.stop();
       hasSelectedProfileThisSession = false;
-      const shouldBypassQr = Boolean(LocalStore.get(GUEST_QR_BYPASS_KEY, false));
       if (isSignedOutRouteAllowed()) {
         return;
       }
-      if (shouldBypassQr) {
-        // Honor "remember last profile" for guests too: skip the picker and go
-        // straight in with the last profile (guests have no PIN).
-        if (
-          ProfileManager.isRememberLastProfileEnabled() &&
-          ProfileManager.hasEverSelectedProfile()
-        ) {
-          enterWithLastProfile({ restoreWebOsRoute: true }).catch((error) => {
-            console.warn("Failed to enter with last profile", error);
-            ProfileManager.clearActiveProfile();
-            if (Router.getCurrent() !== "profileSelection") {
-              Router.navigate(
-                "profileSelection",
-                {},
-                { replaceHistory: true, skipStackPush: true }
-              );
-            }
-          });
-          return;
-        }
+      // This fork has no Nuvio account backend: skip the sign-in QR and the
+      // profile picker, and start as a guest on the last (or first) profile.
+      enterWithLastProfile({ restoreWebOsRoute: true }).catch((error) => {
+        console.warn("Failed to enter with last profile", error);
         ProfileManager.clearActiveProfile();
         if (Router.getCurrent() !== "profileSelection") {
-          Router.navigate(
-            "profileSelection",
-            {},
-            {
-              replaceHistory: true,
-              skipStackPush: true
-            }
-          );
+          Router.navigate("profileSelection", {}, { replaceHistory: true, skipStackPush: true });
         }
-        return;
-      }
-      const hasSeenQr = LocalStore.get("hasSeenAuthQrOnFirstLaunch");
-      Router.navigate("authQrSignIn", {
-        onboardingMode: !hasSeenQr
-      });
+      }).finally(() => globalThis.hideBootSplash?.());
     }
 
     if (state === AuthState.AUTHENTICATED) {
