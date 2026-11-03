@@ -1,4 +1,6 @@
 import { registerMdbListAccountActions } from "./settingsMdbListAccount.js";
+import { registerStremioAccountActions } from "./settingsStremioAccount.js";
+import { StremioAccount } from "../../../data/repository/stremioAccount.js";
 import { MdbListAccount } from "../../../data/repository/mdbListAccount.js";
 /* eslint-disable no-unused-vars */
 import { ScreenUtils } from "../../navigation/screen.js";
@@ -229,6 +231,7 @@ export function createTrackingSettingsMethods() {
         this.actionMap.set(key, (...args) => (current() ? callback(...args) : false));
       this.startTraktClock();
       registerMdbListAccountActions.call(this);
+      registerStremioAccountActions.call(this);
       if (TraktAuthService.getCurrentAuthState().deviceCode) this.startTraktPolling();
       if (SimklAuthService.getCurrentAuthState().userCode) this.startSimklPolling();
       const trakt = TraktAuthService.getCurrentAuthState();
@@ -244,7 +247,8 @@ export function createTrackingSettingsMethods() {
           : []),
         { id: WatchProgressSource.NUVIO_SYNC, label: "Nuvio Sync" },
         ...(traktConnected ? [{ id: WatchProgressSource.TRAKT, label: "Trakt" }] : []),
-        ...(simklConnected ? [{ id: WatchProgressSource.SIMKL, label: "Simkl" }] : [])
+        ...(simklConnected ? [{ id: WatchProgressSource.SIMKL, label: "Simkl" }] : []),
+        ...(StremioAccount.connected() ? [{ id: WatchProgressSource.STREMIO, label: "Stremio" }] : [])
       ];
       const connectedLibrarySources = [
         ...(MdbListAccount.connected()
@@ -449,9 +453,11 @@ export function createTrackingSettingsMethods() {
               ${this.renderActionRow({ focusKey: "integration:mdblist:account", leadingIconSrc: "assets/icons/mdblist_logo.svg", title: "MDBList", subtitle: MdbListAccount.connected() ? t("mdblist_connected_as", [MdbListAccount.user()?.name || t("mdblist_account_fallback")]) : t("mdblist_tracking_description"), value: MdbListAccount.connected() ? t("tracking_status_connected", {}, "Connected") : t("servers_connect"), disabled: !MdbListAccount.configured() && !MdbListAccount.connected() })}
               ${providerRow({ id: "trakt", title: "Trakt", connected: traktConnected, waiting: traktWaiting, username: trakt.username })}
               ${providerRow({ id: "simkl", title: "Simkl", connected: simklConnected, waiting: simklWaiting, username: simkl.username })}
+              ${this.renderActionRow({ focusKey: "integration:stremio:account", title: "Stremio", subtitle: StremioAccount.connected() ? t("stremio_connected_as", [StremioAccount.email() || "Stremio"], `Connected as ${StremioAccount.email() || "Stremio"}`) : t("stremio_description", {}, "Continue Watching, progress and addons from your Stremio account"), value: StremioAccount.connected() ? t("tracking_status_connected", {}, "Connected") : t("servers_connect") })}
             </div>
           </div>
           ${this.mdbListAccountMessage ? `<p class="settings-trakt-message" role="status">${escapeHtml(this.mdbListAccountMessage)}</p>` : ""}
+          ${this.stremioAccountMessage ? `<p class="settings-trakt-message" role="status">${escapeHtml(this.stremioAccountMessage)}</p>` : ""}
           ${this.expandedProvider === "trakt" ? this.renderTrackingTraktAccount(trakt, traktConnected, traktWaiting) : ""}
           ${this.expandedProvider === "simkl" ? this.renderTrackingSimklAccount(simkl, simklConnected, simklWaiting) : ""}
           <div class="settings-trakt-card">

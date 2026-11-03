@@ -14,6 +14,7 @@ import { SimklAuthStore } from "../local/simklAuthStore.js";
 import { MdbListAccount } from "./mdbListAccount.js";
 import { MdbListTracking } from "./mdbListTracking.js";
 import { SimklSyncService } from "./simklSyncService.js";
+import { StremioAccount } from "./stremioAccount.js";
 import { metaRepository } from "./metaRepository.js";
 import {
   invalidateTraktWatchedMoviesCache,
@@ -281,6 +282,8 @@ function selectedContinueWatchingSource() {
   }
   if (requestedSource === WatchProgressSource.MDBLIST && MdbListAccount.connected())
     return WatchProgressSource.MDBLIST;
+  if (requestedSource === WatchProgressSource.STREMIO && StremioAccount.connected())
+    return WatchProgressSource.STREMIO;
   return WatchProgressSource.NUVIO_SYNC;
 }
 
@@ -291,6 +294,7 @@ function selectedLocalProgressSource() {
   if (source === WatchProgressSource.TRAKT) return "trakt_local";
   if (source === WatchProgressSource.SIMKL) return "simkl_local";
   if (source === WatchProgressSource.MDBLIST) return "mdblist_local";
+  if (source === WatchProgressSource.STREMIO) return "stremio_local";
   return WatchProgressSource.NUVIO_SYNC;
 }
 
@@ -319,11 +323,18 @@ function filterForSelectedContinueWatchingSource(items = []) {
         ["mdblist_history", "mdblist_playback"].includes(item.source) ||
         !/^(?:tt\d+|\d+$|(?:imdb|tmdb|tvdb|trakt|mdblist):)/i.test(String(item.contentId || ""))
     );
+  if (source === WatchProgressSource.STREMIO)
+    return all.filter(
+      (item) =>
+        String(item.source || "").startsWith("stremio") ||
+        !/^tt\d+/i.test(String(item.contentId || ""))
+    );
   return all.filter(
     (item) =>
       !isTraktProgressItem(item) &&
       !isSimklProgressItem(item) &&
-      !String(item.source || "").startsWith("mdblist")
+      !String(item.source || "").startsWith("mdblist") &&
+      !String(item.source || "").startsWith("stremio")
   );
 }
 
@@ -854,6 +865,13 @@ class WatchProgressRepository {
     if (syncRemote) {
       queueWatchProgressCloudSync(pid);
     }
+    // Player checkpoints skip syncRemote; Stremio still needs them (TV switched off mid-film).
+    // pushProgress throttles to one write per title every 30s.
+    if (selectedContinueWatchingSource() === WatchProgressSource.STREMIO) {
+      void StremioAccount.pushProgress(progress, { force: syncRemote }).catch((error) =>
+        console.warn("Stremio progress push failed", error)
+      );
+    }
   }
 
   async saveProgressBatch(progressList = [], options = {}) {
@@ -976,6 +994,8 @@ class WatchProgressRepository {
       traktHistoryItems = snapshot.historyItems;
       playbackItems = snapshot.playbackItems;
       watchedShowSeedItems = snapshot.watchedShowSeedItems;
+    } else if (selectedContinueWatchingSource() === WatchProgressSource.STREMIO) {
+      ({ playbackItems } = await StremioAccount.getProgressSnapshot());
     }
 
     const localItems = WatchProgressStore.listForProfile(activeProfileId());
@@ -1020,7 +1040,9 @@ class WatchProgressRepository {
         ? await fetchTraktProgressSnapshot()
         : selectedContinueWatchingSource() === WatchProgressSource.MDBLIST
           ? await MdbListTracking.getProgressSnapshot()
-          : await fetchSimklProgressSnapshot();
+          : selectedContinueWatchingSource() === WatchProgressSource.STREMIO
+            ? await StremioAccount.getProgressSnapshot()
+            : await fetchSimklProgressSnapshot();
     return [
       ...filterForSelectedContinueWatchingSource([
         ...localItems,
@@ -1048,6 +1070,8 @@ class WatchProgressRepository {
     }
     if (source === WatchProgressSource.MDBLIST)
       return { sourceKey, loaded: MdbListTracking.hasLoadedRemoteProgress() };
+    if (source === WatchProgressSource.STREMIO)
+      return { sourceKey, loaded: StremioAccount.hasLoadedRemoteProgress() };
     if (source === WatchProgressSource.SIMKL) {
       return {
         sourceKey,

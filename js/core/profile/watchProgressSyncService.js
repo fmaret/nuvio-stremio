@@ -1,3 +1,4 @@
+import { StremioAccount } from "../../data/repository/stremioAccount.js";
 import { AuthManager } from "../auth/authManager.js";
 import { watchProgressRepository } from "../../data/repository/watchProgressRepository.js";
 import { SupabaseApi } from "../../data/remote/supabase/supabaseApi.js";
@@ -361,7 +362,8 @@ function shouldUseSupabaseWatchProgressSync() {
   const providerSelected =
     (TraktAuthStore.isAuthenticated() && source === WatchProgressSource.TRAKT) ||
     (SimklAuthStore.isAuthenticated() && source === WatchProgressSource.SIMKL) ||
-    (MdbListAccount.connected() && source === WatchProgressSource.MDBLIST);
+    (MdbListAccount.connected() && source === WatchProgressSource.MDBLIST) ||
+    (StremioAccount.connected() && source === WatchProgressSource.STREMIO);
   return !providerSelected;
 }
 

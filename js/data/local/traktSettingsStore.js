@@ -4,6 +4,7 @@ export const WatchProgressSource = {
   MDBLIST: "mdblist",
   TRAKT: "trakt",
   SIMKL: "simkl",
+  STREMIO: "stremio",
   NUVIO_SYNC: "nuvio_sync"
 };
 
@@ -36,6 +37,7 @@ function normalizeWatchProgressSource(value) {
   if (normalized === WatchProgressSource.NUVIO_SYNC) return WatchProgressSource.NUVIO_SYNC;
   if (normalized === WatchProgressSource.SIMKL) return WatchProgressSource.SIMKL;
   if (normalized === WatchProgressSource.MDBLIST) return WatchProgressSource.MDBLIST;
+  if (normalized === WatchProgressSource.STREMIO) return WatchProgressSource.STREMIO;
   return WatchProgressSource.TRAKT;
 }
 
