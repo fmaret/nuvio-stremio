@@ -29,6 +29,8 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: node --test js/data/repository/stremioAccount.test.mjs
       - run: npm run build
+      # index.html pins a fixed ?v= on the bundle; make each deploy fetch the new one.
+      - run: sed -i "s/app\.bundle\.js?v=[^\"]*/app.bundle.js?v=${GITHUB_SHA::7}/" dist/index.html && grep -o 'app.bundle.js?v=[^"]*' dist/index.html
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
