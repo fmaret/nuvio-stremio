@@ -28,6 +28,10 @@ export const CW_ENRICHMENT_CACHE_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
 export const CW_NEXT_UP_NEW_SEASON_UNAIRED_WINDOW_DAYS = 7;
 
 export const HOME_INITIAL_CATALOG_LOAD = 10;
+// Every catalog row stays mounted, so 7 addons (~80 rows) put ~650 cards and
+// ~12k nodes on a 2018 Tizen TV. Keep the first rows in the user's Home order.
+export const HOME_MAX_CATALOG_ROWS_CONSTRAINED = 30;
+export const HOME_MAX_CATALOG_ROWS_LEGACY_TV = 20;
 export const HOME_MAX_ITEMS_PER_ROW_DEFAULT = 15;
 export const HOME_MAX_ITEMS_PER_ROW_CONSTRAINED = 10;
 export const HOME_MAX_ITEMS_PER_ROW_LEGACY_TV = 8;

@@ -1,5 +1,6 @@
 import * as internals from "./homeScreenContext.js";
 import { startHomeContinueWatchingLoad } from "./homeContinueWatchingLoad.js";
+import { HOME_MAX_CATALOG_ROWS_CONSTRAINED, HOME_MAX_CATALOG_ROWS_LEGACY_TV } from "./homeConstants.js";
 
 export function createHomeScreenMethods21() {
   const {
@@ -16,6 +17,7 @@ export function createHomeScreenMethods21() {
     WatchProgressSource,
     buildWatchedTitleIdSet,
     buildCatalogOrderKey,
+    buildCatalogDisableKey,
     catalogShouldShowOnHome,
     catalogSkipStep,
     catalogSupportsExtra,
@@ -167,9 +169,28 @@ export function createHomeScreenMethods21() {
       );
       const routeInputSignature = this.buildHomeRouteInputSignature(addons);
 
+      // Disabled rows are dropped after fetching anyway; skip their requests.
+      const disabledCatalogKeys = new Set(HomeCatalogStore.get().disabled || []);
+      const orderKeyOf = (catalog) => buildCatalogOrderKey(catalog.addonId, catalog.type, catalog.catalogId);
+      let homeDescriptors = uniqueCatalogDescriptors.filter(
+        (catalog) =>
+          !disabledCatalogKeys.has(orderKeyOf(catalog)) &&
+          !disabledCatalogKeys.has(
+            buildCatalogDisableKey(catalog.addonBaseUrl, catalog.type, catalog.catalogId, catalog.catalogName)
+          )
+      );
+      if (this.isPerformanceConstrained()) {
+        const orderIndex = new Map((HomeCatalogStore.get().order || []).map((key, index) => [key, index]));
+        const rank = (catalog) => (orderIndex.has(orderKeyOf(catalog)) ? orderIndex.get(orderKeyOf(catalog)) : Infinity);
+        homeDescriptors = homeDescriptors
+          .slice()
+          .sort((left, right) => rank(left) - rank(right))
+          .slice(0, this.isLegacyTvRuntime() ? HOME_MAX_CATALOG_ROWS_LEGACY_TV : HOME_MAX_CATALOG_ROWS_CONSTRAINED);
+      }
+
       const initialCatalogLoad = this.getInitialCatalogLoadCount();
-      const initialDescriptors = uniqueCatalogDescriptors.slice(0, initialCatalogLoad);
-      const deferredDescriptors = uniqueCatalogDescriptors.slice(initialCatalogLoad);
+      const initialDescriptors = homeDescriptors.slice(0, initialCatalogLoad);
+      const deferredDescriptors = homeDescriptors.slice(initialCatalogLoad);
 
       const progressiveInitialRows = new Map();
       const initialRowsPromise = this.fetchCatalogRows(initialDescriptors, {
@@ -234,9 +255,7 @@ export function createHomeScreenMethods21() {
       // A background refresh resolves only the initial catalog batch first, so
       // assigning it directly discards every already-rendered row outside that
       // batch. Merge the configured rows and let fresh data replace duplicates.
-      const configuredCatalogKeys = new Set(
-        uniqueCatalogDescriptors.map((catalog) => buildCatalogOrderKey(catalog.addonId, catalog.type, catalog.catalogId))
-      );
+      const configuredCatalogKeys = new Set(homeDescriptors.map(orderKeyOf));
       const nextInitialRows = mergeRefreshedHomeRows(this.rows, initialRows, configuredCatalogKeys, {
         background
       });
